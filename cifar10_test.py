@@ -94,7 +94,7 @@ if __name__ == '__main__':
     parser.add_argument(
             '--train_dir',
             type=str,
-            default='/home/mattheww/machine_learning/datasets/cifar10/lenet_train_log',
+            default='/home/mattheww/machine_learning/datasets/cifar10/lenet_train_log2',
             help='Director where to load checkpoint')
     parser.add_argument(
             '--test_dir',

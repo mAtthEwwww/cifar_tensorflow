@@ -144,7 +144,7 @@ if __name__ == '__main__':
     parser.add_argument(
             '--train_dir',
             type=str,
-            default='/home/mattheww/machine_learning/datasets/cifar10/lenet_train_log',
+            default='/home/mattheww/machine_learning/datasets/cifar10/lenet_train_log2',
             help='Directory where to write event logs')
     parser.add_argument(
             '--log_device_placement',
@@ -169,12 +169,12 @@ if __name__ == '__main__':
     parser.add_argument(
             '--learning_rate',
             type=float,
-            default=0.05,
+            default=0.1,
             help='Initial Learning rate')
     parser.add_argument(
             '--decay_epochs',
             type=float,
-            default=10.0,
+            default=20.0,
             help='Number of epochs per learning rate decay.')
     parser.add_argument(
             '--decay_factor',

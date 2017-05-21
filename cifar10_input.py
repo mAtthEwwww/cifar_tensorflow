@@ -1,9 +1,11 @@
 import os
 import tensorflow as tf
 
-HEIGHT = 24
-WIDTH = 24
+HEIGHT = 32
+WIDTH = 32
 CHANNEL = 3
+
+CROP_WIDTH = 3
 
 NUM_CLASSES = 10
 NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN = 50000
@@ -13,10 +15,7 @@ MIN_FRACTION_OF_EXAMPLES_IN_QUEUE = 0.4
 
 def read_sample(filename_queue):
 
-    height = 32
-    width = 32
-    channel = 3
-    image_bytes = height * width * channel
+    image_bytes = HEIGHT * WIDTH * CHANNEL
 
     label_bytes = 1
 
@@ -39,7 +38,7 @@ def read_sample(filename_queue):
                     tf.slice(uint8Bytes,
                             begin=[label_bytes],
                             size=[image_bytes]),
-                    [channel, height, width]),
+                    [CHANNEL, HEIGHT, WIDTH]),
                 [1, 2, 0])
 
     return image, label
@@ -56,6 +55,10 @@ def load_batch(filenames, batch_size, isTrain=False, isShuffle=False):
     label.set_shape([1])
 
     if isTrain:
+        image = tf.image.resize_image_with_crop_or_pad(
+                image=image,
+                target_height = HEIGHT + CROP_WIDTH * 2,
+                target_width = WIDTH + CROP_WIDTH * 2)
         image = tf.random_crop(image, [HEIGHT, WIDTH, CHANNEL])
         image = tf.image.random_flip_left_right(image)
         image = tf.image.random_brightness(image, max_delta=63)
@@ -65,10 +68,6 @@ def load_batch(filenames, batch_size, isTrain=False, isShuffle=False):
                                 MIN_FRACTION_OF_EXAMPLES_IN_QUEUE)
 
     else :
-        image = tf.image.resize_image_with_crop_or_pad(image,
-                                                    HEIGHT,
-                                                    WIDTH)
-
         min_queue_examples = int(NUM_EXAMPLES_PER_EPOCH_FOR_TEST *
                                 MIN_FRACTION_OF_EXAMPLES_IN_QUEUE)
 
