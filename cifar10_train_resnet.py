@@ -11,6 +11,7 @@ import resnet
 NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN = cifar10_input.NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN
 
 
+STAGE = [32000, 48000]
 
 def _grad_summary(gradpairs):
     for grad, var in gradpairs:
@@ -19,20 +20,18 @@ def _grad_summary(gradpairs):
 
 def _variable_summary():
     for var in tf.trainable_variables():
-        tf.summary.histogram(var.op.name, var)
+        tf.summary.histogram(var.op.name + '/value', var)
 
-def train(total_loss, global_step):
-    num_batches_per_epoch = NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN / FLAGS.batch_size
-    decay_steps = int(num_batches_per_epoch * FLAGS.decay_epochs)
+def train(total_loss, global_step, lr):
+    #num_batches_per_epoch = NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN / FLAGS.batch_size
+    #decay_steps = int(num_batches_per_epoch * FLAGS.decay_epochs)
 
-    lr = tf.train.exponential_decay(
-            learning_rate=FLAGS.learning_rate,
-            global_step=global_step,
-            decay_steps=decay_steps,
-            decay_rate=FLAGS.decay_factor,
-            staircase=True)
-        
-    tf.summary.scalar('learning_rate', lr)
+    #lr = tf.train.exponential_decay(
+    #        learning_rate=FLAGS.learning_rate,
+    #        global_step=global_step,
+    #        decay_steps=decay_steps,
+    #        decay_rate=FLAGS.decay_factor,
+    #        staircase=True)
 
     opt = tf.train.GradientDescentOptimizer(lr)
 
@@ -40,6 +39,8 @@ def train(total_loss, global_step):
 
     apply_gradient_op = opt.apply_gradients(gradpairs, global_step=global_step)
         
+    tf.summary.scalar('learning_rate', lr)
+
     _variable_summary()
 
     _grad_summary(gradpairs)
@@ -69,41 +70,50 @@ def main(_):
                             isTrain=True,
                             isShuffle=True)
 
-        logits, l2_losses = resnet.inference(images, isTrain=True)
+        logits = resnet.inference(images, isTrain=True)
 
-        total_loss = resnet.loss(logits, labels, l2_losses)
+        total_loss = resnet.loss(logits, labels)
 
-        train_op = train(total_loss, global_step)
+        lr = tf.placeholder(shape=[], dtype=tf.float32)
 
-        class _LoggerHook(tf.train.SessionRunHook):
+        train_op = train(total_loss, global_step, lr)
+
+        class _Hook(tf.train.SessionRunHook):
         
             def begin(self):
-                self._step = -1
+                self._lr = FLAGS.learning_rate
                 self._start_time = time.time()
         
             def before_run(self, run_context):
-                self._step += 1
-                return tf.train.SessionRunArgs(total_loss)
+                return tf.train.SessionRunArgs(
+                        [total_loss, global_step],
+                        feed_dict={lr: self._lr})
 
             def after_run(self, run_context, run_values):
-                if self._step % FLAGS.log_frequency == 0:
+                step = run_values.results[1] - 1
+
+                if step in STAGE:
+                    self._lr *= FLAGS.decay_factor
+
+                if step % FLAGS.log_frequency == 0:
                     current_time = time.time()
                     duration = current_time - self._start_time
                     self._start_time = current_time
 
-                    loss_value = run_values.results
+                    loss_value = run_values.results[0]
+
                     examples_per_sec = FLAGS.log_frequency*FLAGS.batch_size/duration
                     sec_per_batch = float(duration / FLAGS.log_frequency)
                     format_str = ('%s: step %d, loss = %.2f (%.1f examples/sec; %.3f '
                                   'sec/batch)')
-                    print(format_str % (datetime.now(), self._step, loss_value,
+                    print(format_str % (datetime.now(), step, loss_value,
                                          examples_per_sec, sec_per_batch))
 
         with tf.train.MonitoredTrainingSession(
                 checkpoint_dir=FLAGS.train_dir, 
                 hooks=[tf.train.StopAtStepHook(last_step=FLAGS.max_steps),
                     tf.train.NanTensorHook(total_loss),
-                    _LoggerHook()],
+                    _Hook()],
                 config=tf.ConfigProto(
                     log_device_placement=FLAGS.log_device_placement)) as mon_sess:
             while not mon_sess.should_stop():

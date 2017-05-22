@@ -2,11 +2,11 @@ import numpy as np
 import tensorflow as tf
 import cifar10_input
 
-NUM_CHANNELS = cifar_input.CHANNEL
+NUM_CHANNELS = cifar10_input.CHANNEL
 NUM_CLASSES = cifar10_input.NUM_CLASSES
 
-CONV_WEIGHT_DECAY = 0.00005
-FC_WEIGHT_DECAY = 0.00005
+CONV_WEIGHT_DECAY = 0.0001
+FC_WEIGHT_DECAY = 0.0001
 #Tensor.get_shape().as_list()
 
 def _conv(name, x, kernel_shape, strides, weight_decay=0.0):
@@ -22,7 +22,7 @@ def _conv(name, x, kernel_shape, strides, weight_decay=0.0):
             kernel = tf.get_variable(
                     name='weights',
                     shape=kernel_shape,
-                    dtype=float32,
+                    dtype=tf.float32,
                     initializer=tf.random_normal_initializer(
                         stddev=np.sqrt(2.0/fan_in),
                         seed=None,
@@ -39,11 +39,11 @@ def _fully_connected(name, x, out_dim, weight_decay=0.0):
     with tf.variable_scope(name):
         with tf.device('/cpu:0'):
             if weight_decay > 0 :
-                regularizer = tf.contrib.layer.l2_regularizer(weight_decay)
+                regularizer = tf.contrib.layers.l2_regularizer(weight_decay)
             else :
                 regularizer = None
 
-            batch_size = x.get_shape()[0].value()
+            batch_size = x.get_shape()[0].value
 
             x = tf.reshape(x, [batch_size, -1])
 
@@ -57,15 +57,15 @@ def _fully_connected(name, x, out_dim, weight_decay=0.0):
                         dtype=tf.float32),
                     regularizer=regularizer)
 
-            b = tf.get_varible(
+            b = tf.get_variable(
                     name='biases',
                     shape=[out_dim],
                     dtype=tf.float32,
-                    initializer=tf.random_constant_initializer(
-                        value=0.0
+                    initializer=tf.constant_initializer(
+                        value=0.0,
                         dtype=tf.float32))
 
-        return tf.bias_add(tf.matmul(x, W), b)
+        return tf.nn.bias_add(tf.matmul(x, W), b)
 
 def _batch_norm(name, x, isTrain):
     with tf.variable_scope(name):
@@ -96,15 +96,16 @@ def _batch_norm(name, x, isTrain):
 
             moving_variance = tf.get_variable(
                     name='moving_variance',
+                    shape=[num_channels],
                     initializer=tf.constant_initializer(
                         value=1.0,
                         dtype=tf.float32),
                     trainable=False)
 
         if isTrain:
-            axes = list(range(len(x.get_shape) - 1))
+            axes = list(range(len(x.get_shape()) - 1))
 
-            mean, variance = tf.moments(
+            mean, variance = tf.nn.moments(
                     x=x,
                     axes=axes,
                     name='moments')
@@ -115,7 +116,7 @@ def _batch_norm(name, x, isTrain):
 
             with tf.control_dependencies([ema_op]):
 
-                return tf.nn.batch_normaliztion(
+                return tf.nn.batch_normalization(
                         x=x,
                         mean=mean,
                         variance=variance,
@@ -166,13 +167,13 @@ def _residual(x, in_filter, out_filter, strides, isTrain):
 
     with tf.variable_scope('sub_add'):
         if in_filter != out_filter:
-            x = _conv(
+            orig_x = _conv(
                     name='conv3',
-                    x=x,
+                    x=orig_x,
                     kernel_shape=[1, 1, in_filter, out_filter],
                     strides=strides)
 
-        else if strides != [1, 1, 1, 1]:
+        elif strides != [1, 1, 1, 1]:
             orig_x = tf.nn.avg_pool(
                     value=orig_x, 
                     ksize=strides,
@@ -182,57 +183,64 @@ def _residual(x, in_filter, out_filter, strides, isTrain):
 
     return x
 
-def _global_average_pool(x):
+def _global_avg_pool(x):
     return tf.reduce_mean(x, [1, 2])
 
 def inference(
         image,
-        num_blocks=[5, 5, 5],
+        num_units=[5, 5, 5],
         num_channels=[16, 16, 32, 64],
         isTrain=False): 
 
-    num_blocks = [1] + num_blocks
+    num_units = [1] + num_units
     sampling_strides = [1, 2, 2, 1]
     unsampling_strides = [1, 1, 1, 1]
 
-    with tf.variable_scope('part_0'):
+    with tf.variable_scope('unit_0'):
         x = _conv(
                 name='conv',
                 x=image, 
                 kernel_shape=[3, 3, NUM_CHANNELS, num_channels[0]],
-                strides=umsampling_strides,
+                strides=unsampling_strides,
                 weight_decay=CONV_WEIGHT_DECAY)
 
-    for part in range(1, len(num_channels)):
-        with tf.variable_scope('part_%d' % part):
+        x = tf.nn.relu(x)
+
+    for unit in range(1, len(num_channels)):
+        with tf.variable_scope('unit_%d' % unit):
             with tf.variable_scope('block_0'):
                 x = _residual(
                         x=x,
-                        in_filter=num_channels[part-1], 
-                        out_filter=num_channels[part],
+                        in_filter=num_channels[unit-1], 
+                        out_filter=num_channels[unit],
                         strides=sampling_strides,
                         isTrain=isTrain)
 
-            for block in range(1, num_blocks[part]):
-                with tf.variable_scope('block_%d' % i):
+            for block in range(1, num_units[unit]):
+                with tf.variable_scope('block_%d' % block):
                     x = _residual(
                             x=x,
-                            in_filter=num_channels[part],
-                            out_filter=num_channels[part],
+                            in_filter=num_channels[unit],
+                            out_filter=num_channels[unit],
                             strides=unsampling_strides,
                             isTrain=isTrain)
 
-    with tf.variable_scope('part_last'):
+    with tf.variable_scope('unit_global_avg'):
         x = _batch_norm(
-                name='bn_out',
+                name='bn_fn',
                 x=x,
                 isTrain=isTrain)
+
         x = tf.nn.relu(x)
 
         x = _global_avg_pool(x)
 
-    with tf.variable_scope('logits'):
-        logits = _fully_connected(x, NUM_CLASSES)
+    with tf.variable_scope('unit_fn'):
+        logits = _fully_connected(
+                name='fn',
+                x=x,
+                out_dim=NUM_CLASSES,
+                weight_decay=FC_WEIGHT_DECAY)
 
     return logits
 
@@ -243,7 +251,7 @@ def loss(logits, labels):
             name='sample_cross_entropy')
 
     batch_cross_entropy = tf.reduce_mean(
-            input_tensor=batch_cross_entropy,
+            input_tensor=sample_cross_entropy,
             axis=0,
             name='cross_entropy')
 
@@ -251,7 +259,7 @@ def loss(logits, labels):
 
     loss_ = tf.add_n([batch_cross_entropy] + regularization_losses)
 
-    tf.scalar_summary('loss', loss_)
+    tf.summary.scalar('loss', loss_)
 
     return loss_
 
