@@ -21,7 +21,8 @@ def train(total_loss, global_step):
             decay_steps=decay_steps,
             decay_rate=FLAGS.decay_factor,
             staircase=True)
-    # decayed_learning_rate = learning_rate * #                    decay_rate ^ (global_step / decay_steps)
+    # decayed_learning_rate = learning_rate * 
+    #                    decay_rate ^ (global_step / decay_steps)
     
     tf.summary.scalar('learning_rate', lr)
 

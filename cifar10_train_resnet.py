@@ -23,16 +23,7 @@ def _variable_summary():
         tf.summary.histogram(var.op.name + '/value', var)
 
 def train(total_loss, global_step, lr):
-    #num_batches_per_epoch = NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN / FLAGS.batch_size
-    #decay_steps = int(num_batches_per_epoch * FLAGS.decay_epochs)
-
-    #lr = tf.train.exponential_decay(
-    #        learning_rate=FLAGS.learning_rate,
-    #        global_step=global_step,
-    #        decay_steps=decay_steps,
-    #        decay_rate=FLAGS.decay_factor,
-    #        staircase=True)
-
+    
     opt = tf.train.GradientDescentOptimizer(lr)
 
     gradpairs = opt.compute_gradients(total_loss)

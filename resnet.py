@@ -2,11 +2,15 @@ import numpy as np
 import tensorflow as tf
 import cifar10_input
 
+from tensorflow.python.training import moving_averages
+
 NUM_CHANNELS = cifar10_input.CHANNEL
 NUM_CLASSES = cifar10_input.NUM_CLASSES
 
 CONV_WEIGHT_DECAY = 0.0001
 FC_WEIGHT_DECAY = 0.0001
+BN_DECAY = 0.999
+
 #Tensor.get_shape().as_list()
 
 def _conv(name, x, kernel_shape, strides, weight_decay=0.0):
@@ -86,21 +90,21 @@ def _batch_norm(name, x, isTrain):
                         value=0.0,
                         dtype=tf.float32))
 
-            moving_mean = tf.get_variable(
-                    name='moving_mean',
-                    shape=[num_channels],
-                    initializer=tf.constant_initializer(
-                        value=0.0,
-                        dtype=tf.float32),
-                    trainable=False)
+        moving_mean = tf.get_variable(
+                name='moving_mean',
+                shape=[num_channels],
+                initializer=tf.constant_initializer(
+                    value=0.0,
+                    dtype=tf.float32),
+                trainable=False)
 
-            moving_variance = tf.get_variable(
-                    name='moving_variance',
-                    shape=[num_channels],
-                    initializer=tf.constant_initializer(
-                        value=1.0,
-                        dtype=tf.float32),
-                    trainable=False)
+        moving_variance = tf.get_variable(
+                name='moving_variance',
+                shape=[num_channels],
+                initializer=tf.constant_initializer(
+                    value=1.0,
+                    dtype=tf.float32),
+                trainable=False)
 
         if isTrain:
             axes = list(range(len(x.get_shape()) - 1))
@@ -110,12 +114,17 @@ def _batch_norm(name, x, isTrain):
                     axes=axes,
                     name='moments')
 
-            ema = tf.train.ExponentialMovingAverage(0.99, name='avg')
+            moving_mean_op = moving_averages.assign_moving_average(
+                    moving_mean,
+                    mean,
+                    BN_DECAY)
 
-            ema_op = ema.apply([mean, variance])
+            moving_average_op = moving_averages.assign_moving_average(
+                    moving_variance,
+                    variance,
+                    BN_DECAY)
 
-            with tf.control_dependencies([ema_op]):
-
+            with tf.control_dependencies([moving_mean_op, moving_average_op]):
                 return tf.nn.batch_normalization(
                         x=x,
                         mean=mean,
@@ -245,21 +254,36 @@ def inference(
     return logits
 
 def loss(logits, labels):
-    sample_cross_entropy = tf.nn.sparse_softmax_cross_entropy_with_logits(
-            labels=labels,
-            logits=logits,
-            name='sample_cross_entropy')
+    with tf.variable_scope('loss') as scope:
+        batch_cross_entropy = tf.nn.sparse_softmax_cross_entropy_with_logits(
+                labels=labels,
+                logits=logits)
 
-    batch_cross_entropy = tf.reduce_mean(
-            input_tensor=sample_cross_entropy,
-            axis=0,
-            name='cross_entropy')
+        cross_entropy_loss = tf.reduce_mean(
+                input_tensor=batch_cross_entropy,
+                axis=0,
+                name='cross_entropy')
 
-    regularization_losses = tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES)
+        weight_losses = tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES)
 
-    loss_ = tf.add_n([batch_cross_entropy] + regularization_losses)
+        weight_loss = tf.add_n(weight_losses, name='weights_loss')
 
-    tf.summary.scalar('loss', loss_)
+        ema = tf.train.ExponentialMovingAverage(0.99)
 
-    return loss_
+        total_loss = cross_entropy_loss + weight_loss
+
+        loss_ema_op = ema.apply([cross_entropy_loss, weight_loss, total_loss])
+
+        tf.summary.scalar(cross_entropy_loss.op.name, cross_entropy_loss)
+        tf.summary.scalar(weight_loss.op.name, weight_loss)
+        tf.summary.scalar(total_loss.op.name, total_loss)
+        tf.summary.scalar(cross_entropy_loss.op.name + '_average',
+                ema.average(cross_entropy_loss))
+        tf.summary.scalar(weight_loss.op.name + '_average',
+                ema.average(weight_loss))
+        tf.summary.scalar(total_loss.op.name + '_average',
+                ema.average(total_loss))
+
+
+    return total_loss
 
