@@ -5,11 +5,21 @@ import time
 from datetime import datetime
 
 import tensorflow as tf
-import lenet
 import cifar10_input
+import resnet
 
 NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN = cifar10_input.NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN
 
+
+
+def _grad_summary(gradpairs):
+    for grad, var in gradpairs:
+        if grad is not None :
+            tf.summary.histogram(var.op.name + '/gradient', grad)
+
+def _variable_summary():
+    for var in tf.trainable_variables():
+        tf.summary.histogram(var.op.name, var)
 
 def train(total_loss, global_step):
     num_batches_per_epoch = NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN / FLAGS.batch_size
@@ -21,20 +31,18 @@ def train(total_loss, global_step):
             decay_steps=decay_steps,
             decay_rate=FLAGS.decay_factor,
             staircase=True)
-    # decayed_learning_rate = learning_rate * #                    decay_rate ^ (global_step / decay_steps)
-    
+        
     tf.summary.scalar('learning_rate', lr)
 
     opt = tf.train.GradientDescentOptimizer(lr)
-    gradpairs = opt.compute_gradients(total_loss)
-    apply_gradient_op = opt.apply_gradients(gradpairs, global_step=global_step)
 
-    for var in tf.trainable_variables():
-        tf.summary.histogram(var.op.name, var)
+    gradpairs = opt.compute_gradients(total_loss)
+
+    apply_gradient_op = opt.apply_gradients(gradpairs, global_step=global_step)
         
-    for grad, var in gradpairs:
-        if grad is not None :
-            tf.summary.histogram(var.op.name + '/gradient', grad)
+    _variable_summary()
+
+    _grad_summary(gradpairs)
 
     variable_averages = tf.train.ExponentialMovingAverage(
             decay=FLAGS.variable_averages_decay,
@@ -61,9 +69,9 @@ def main(_):
                             isTrain=True,
                             isShuffle=True)
 
-        logits, l2_losses = lenet.inference(images, isTrain=True)
+        logits, l2_losses = resnet.inference(images, isTrain=True)
 
-        total_loss = lenet.loss(logits, labels, l2_losses)
+        total_loss = resnet.loss(logits, labels, l2_losses)
 
         train_op = train(total_loss, global_step)
 
@@ -112,7 +120,7 @@ if __name__ == '__main__':
     parser.add_argument(
             '--train_dir',
             type=str,
-            default='/home/mattheww/machine_learning/datasets/cifar10/lenet_train_log',
+            default='/home/mattheww/machine_learning/datasets/cifar10/resnet_train_log',
             help='Directory where to write event logs')
     parser.add_argument(
             '--log_device_placement',

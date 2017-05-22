@@ -2,12 +2,13 @@ import tensorflow as tf
 import cifar10_input
 
 NUM_CLASSES = cifar10_input.NUM_CLASSES
+NUM_CHANNELS = cifar10_input.CHANNEL
 
 
 """
 Network abstraction
 """
-conv1_weights_shape = [5, 5, 3, 64]
+conv1_weights_shape = [5, 5, NUM_CHANNELS, 64]
 conv1_weights_strides = [1, 1, 1, 1]
 conv1_weights_padding = 'SAME'
 conv1_weights_decay = 0.0
@@ -251,4 +252,39 @@ def inference(images, isTrain=False):
         return logits, l2_losses
     else :
         return logits
+
+
+def loss(logits, labels, losses):
+    tf.cast(labels, tf.float32)
+    batch_cross_entropy = tf.nn.sparse_softmax_cross_entropy_with_logits(
+            labels=labels,
+            logits=logits,
+            name='cross_entropy')
+    mean_cross_entropy = tf.reduce_mean(
+                            batch_cross_entropy,
+                            name='loss/cross_entropy',
+                            axis=0)
+
+    losses.append(mean_cross_entropy)
+
+    total_loss = tf.add_n(losses, name='loss/total_loss')
+
+    losses.append(total_loss)
+
+    for l in losses:
+        tf.summary.scalar(l.op.name, l)
+
+    ema = tf.train.ExponentialMovingAverage(0.9, name='avg')
+
+    loss_ema_op = ema.apply([total_loss])
+
+    tf.summary.scalar(total_loss.op.name + '_average', ema.average(total_loss))
+
+    with tf.control_dependencies([loss_ema_op]):
+        # make sure loss_ema_op is running
+        total_loss = tf.identity(total_loss)
+
+    return total_loss
+
+
 
