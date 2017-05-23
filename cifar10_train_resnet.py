@@ -11,7 +11,7 @@ import resnet
 NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN = cifar10_input.NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN
 
 
-STAGE = [32000, 60000]
+STAGE = [50000, 70000]
 
 def _grad_summary(gradpairs):
     for grad, var in gradpairs:
