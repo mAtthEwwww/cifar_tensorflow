@@ -147,7 +147,7 @@ if __name__ == '__main__':
     parser.add_argument(
             '--warming_learning_rate',
             type=float,
-            default=0.1,
+            default=0.01,
             help='Warming learning rate',)
     parser.add_argument(
             '--warming_step',
@@ -167,7 +167,7 @@ if __name__ == '__main__':
     parser.add_argument(
             '--learning_rate',
             type=float,
-            default=1.0,
+            default=0.1,
             help='Initial Learning rate')
     parser.add_argument(
             '--decay_epochs',
