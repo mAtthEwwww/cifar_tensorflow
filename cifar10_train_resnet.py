@@ -11,7 +11,7 @@ import resnet
 NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN = cifar10_input.NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN
 
 
-STAGE = [32000, 48000]
+STAGE = [32000, 60000]
 
 def _grad_summary(gradpairs):
     for grad, var in gradpairs:
@@ -22,9 +22,21 @@ def _variable_summary():
     for var in tf.trainable_variables():
         tf.summary.histogram(var.op.name + '/value', var)
 
+def _lr_in_stage(learning_rate, step, stage):
+    if step < FLAGS.warming_step:
+        return FLAGS.warming_learning_rate
+    for i in range(len(stage)):
+        if step > stage[i]:
+            learning_rate *= FLAGS.decay_factor
+        else :
+            break
+    return learning_rate
+
+
 def train(total_loss, global_step, lr):
-    
-    opt = tf.train.GradientDescentOptimizer(lr)
+
+    #opt = tf.train.GradientDescentOptimizer(lr)
+    opt = tf.train.MomentumOptimizer(lr, 0.9)
 
     gradpairs = opt.compute_gradients(total_loss)
 
@@ -83,8 +95,7 @@ def main(_):
             def after_run(self, run_context, run_values):
                 step = run_values.results[1] - 1
 
-                if step in STAGE:
-                    self._lr *= FLAGS.decay_factor
+                self._lr = _lr_in_stage(FLAGS.learning_rate, step, STAGE)
 
                 if step % FLAGS.log_frequency == 0:
                     current_time = time.time()
@@ -95,9 +106,9 @@ def main(_):
 
                     examples_per_sec = FLAGS.log_frequency*FLAGS.batch_size/duration
                     sec_per_batch = float(duration / FLAGS.log_frequency)
-                    format_str = ('%s: step %d, loss = %.2f (%.1f examples/sec; %.3f '
+                    format_str = ('lr: %.4f: step %d, loss = %.2f (%.1f examples/sec; %.3f '
                                   'sec/batch)')
-                    print(format_str % (datetime.now(), step, loss_value,
+                    print(format_str % (self._lr, step, loss_value,
                                          examples_per_sec, sec_per_batch))
 
         with tf.train.MonitoredTrainingSession(
@@ -131,8 +142,18 @@ if __name__ == '__main__':
     parser.add_argument(
             '--max_steps',
             type=int,
-            default=30000,
+            default=100000,
             help='Number of batches to run.')
+    parser.add_argument(
+            '--warming_learning_rate',
+            type=float,
+            default=0.1,
+            help='Warming learning rate',)
+    parser.add_argument(
+            '--warming_step',
+            type=int,
+            default=500,
+            help='Number of step for warming up')
     parser.add_argument(
             '--batch_size',
             type=int,
@@ -146,7 +167,7 @@ if __name__ == '__main__':
     parser.add_argument(
             '--learning_rate',
             type=float,
-            default=0.1,
+            default=1.0,
             help='Initial Learning rate')
     parser.add_argument(
             '--decay_epochs',

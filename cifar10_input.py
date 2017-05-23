@@ -5,7 +5,7 @@ HEIGHT = 32
 WIDTH = 32
 CHANNEL = 3
 
-CROP_WIDTH = 3
+CROP_WIDTH = 4
 
 NUM_CLASSES = 10
 NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN = 50000
@@ -61,8 +61,8 @@ def load_batch(filenames, batch_size, isTrain=False, isShuffle=False):
                 target_width = WIDTH + CROP_WIDTH * 2)
         image = tf.random_crop(image, [HEIGHT, WIDTH, CHANNEL])
         image = tf.image.random_flip_left_right(image)
-        image = tf.image.random_brightness(image, max_delta=63)
-        image = tf.image.random_contrast(image, lower=0.2, upper=1.8)
+        #image = tf.image.random_brightness(image, max_delta=63)
+        #image = tf.image.random_contrast(image, lower=0.2, upper=1.8)
         
         min_queue_examples = int(NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN *
                                 MIN_FRACTION_OF_EXAMPLES_IN_QUEUE)

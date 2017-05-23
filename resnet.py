@@ -195,22 +195,27 @@ def _residual(x, in_filter, out_filter, strides, isTrain):
 def _global_avg_pool(x):
     return tf.reduce_mean(x, [1, 2])
 
+def _get_strides(isSampling):
+    if isSampling:
+        return [1, 2, 2, 1]
+    else :
+        return [1, 1, 1, 1]
+
 def inference(
         image,
         num_units=[5, 5, 5],
         num_channels=[16, 16, 32, 64],
+        sampling=[False, False, True, True],
         isTrain=False): 
 
     num_units = [1] + num_units
-    sampling_strides = [1, 2, 2, 1]
-    unsampling_strides = [1, 1, 1, 1]
 
     with tf.variable_scope('unit_0'):
         x = _conv(
                 name='conv',
                 x=image, 
                 kernel_shape=[3, 3, NUM_CHANNELS, num_channels[0]],
-                strides=unsampling_strides,
+                strides=_get_strides(sampling[0]),
                 weight_decay=CONV_WEIGHT_DECAY)
 
         x = tf.nn.relu(x)
@@ -222,7 +227,7 @@ def inference(
                         x=x,
                         in_filter=num_channels[unit-1], 
                         out_filter=num_channels[unit],
-                        strides=sampling_strides,
+                        strides=_get_strides(sampling[unit]),
                         isTrain=isTrain)
 
             for block in range(1, num_units[unit]):
@@ -231,7 +236,7 @@ def inference(
                             x=x,
                             in_filter=num_channels[unit],
                             out_filter=num_channels[unit],
-                            strides=unsampling_strides,
+                            strides=_get_strides(False),
                             isTrain=isTrain)
 
     with tf.variable_scope('unit_global_avg'):
@@ -270,20 +275,23 @@ def loss(logits, labels):
 
         ema = tf.train.ExponentialMovingAverage(0.99)
 
-        total_loss = cross_entropy_loss + weight_loss
+        #total_loss = cross_entropy_loss + weight_loss
+        total_loss = tf.add(cross_entropy_loss, weight_loss, name='total_loss')
 
         loss_ema_op = ema.apply([cross_entropy_loss, weight_loss, total_loss])
 
-        tf.summary.scalar(cross_entropy_loss.op.name, cross_entropy_loss)
-        tf.summary.scalar(weight_loss.op.name, weight_loss)
-        tf.summary.scalar(total_loss.op.name, total_loss)
-        tf.summary.scalar(cross_entropy_loss.op.name + '_average',
-                ema.average(cross_entropy_loss))
-        tf.summary.scalar(weight_loss.op.name + '_average',
-                ema.average(weight_loss))
-        tf.summary.scalar(total_loss.op.name + '_average',
-                ema.average(total_loss))
+    tf.summary.scalar(cross_entropy_loss.op.name, cross_entropy_loss)
+    tf.summary.scalar(weight_loss.op.name, weight_loss)
+    tf.summary.scalar(total_loss.op.name, total_loss)
+    tf.summary.scalar(cross_entropy_loss.op.name + '_average',
+            ema.average(cross_entropy_loss))
+    tf.summary.scalar(weight_loss.op.name + '_average',
+            ema.average(weight_loss))
+    tf.summary.scalar(total_loss.op.name + '_average',
+            ema.average(total_loss))
 
+    with tf.control_dependencies([loss_ema_op]):
+        total_loss = tf.identity(total_loss)
 
     return total_loss
 
