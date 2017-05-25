@@ -11,7 +11,7 @@ import resnet
 NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN = cifar10_input.NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN
 
 
-STAGE = [50000, 70000]
+STAGE = [32000, 48000]
 
 def _grad_summary(gradpairs):
     for grad, var in gradpairs:
@@ -132,7 +132,7 @@ if __name__ == '__main__':
     parser.add_argument(
             '--train_dir',
             type=str,
-            default='/home/mattheww/machine_learning/datasets/cifar10/resnet_train_log',
+            default='/home/mattheww/machine_learning/datasets/cifar10/resnet_train',
             help='Directory where to write event logs')
     parser.add_argument(
             '--log_device_placement',
@@ -142,7 +142,7 @@ if __name__ == '__main__':
     parser.add_argument(
             '--max_steps',
             type=int,
-            default=100000,
+            default=80000,
             help='Number of batches to run.')
     parser.add_argument(
             '--warming_learning_rate',
@@ -157,7 +157,7 @@ if __name__ == '__main__':
     parser.add_argument(
             '--batch_size',
             type=int,
-            default=64,
+            default=128,
             help='Number of images to process in a batch.')
     parser.add_argument(
             '--log_frequency',

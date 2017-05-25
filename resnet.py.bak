@@ -13,7 +13,8 @@ BN_DECAY = 0.999
 
 #Tensor.get_shape().as_list()
 
-def _conv(name, x, kernel_shape, strides, weight_decay=0.0):
+def _conv(name, x, kernel_shape, strides, weight_decay=0.0, bias=False):
+    # bias!!
     with tf.variable_scope(name):
         with tf.device('/cpu:0'):
             if weight_decay > 0 :
@@ -33,11 +34,23 @@ def _conv(name, x, kernel_shape, strides, weight_decay=0.0):
                         dtype=tf.float32),
                     regularizer=regularizer)
 
+            if bias:
+                biases = tf.get_variable(
+                        name='biases',
+                        shape=[kernel_shape[3]],
+                        dtype=tf.float32,
+                        initializer=tf.constant_initializer(
+                            value=0.0,
+                            dtype=tf.float32))
+
         x = tf.nn.conv2d(
                 input=x,
                 filter=kernel,
                 strides=strides,
                 padding='SAME')
+
+        if bias:
+            x = tf.nn.bias_add(x, biases)
 
         return x
 
@@ -146,38 +159,24 @@ def _batch_norm(name, x, isTrain):
                     variance_epsilon=0.0001)
 
 
-def _residual(x, in_filter, out_filter, strides, activate_before_residual, isTrain):
+def _residual(x, in_filter, out_filter, strides, isTrain):
+    shortcut_x = x
 
-    if activate_before_residual:
-        with tf.variable_scope('shared_activation'):
-            x = _batch_norm(
-                    name='bn1',
-                    x=x,
-                    isTrain=isTrain)
+    with tf.variable_scope('sub1'):
+        x = _batch_norm(
+                name='bn1', 
+                x=x, 
+                isTrain=isTrain)
 
-            x = tf.nn.relu(x)
+        x = tf.nn.relu(x)
 
-            shortcut_x = x
-
-    else :
-        with tf.variable_scope('shortcut_path'):
-            shortcut_x = x
-
-        with tf.variable_scope('residual_path'):
-            x = _batch_norm(
-                    name='bn1',
-                    x=x,
-                    isTrain=isTrain)
-
-            x = tf.nn.relu(x)
-
-    with tf.variable_scope('residual_path'):
         x = _conv(
                 name='conv1',
                 x=x,
                 kernel_shape=[3, 3, in_filter, out_filter],
                 strides=strides)
 
+    with tf.variable_scope('sub2'):
         x = _batch_norm(
                 name='bn2',
                 x=x,
@@ -191,10 +190,10 @@ def _residual(x, in_filter, out_filter, strides, activate_before_residual, isTra
                 kernel_shape=[3, 3, out_filter, out_filter],
                 strides=[1, 1, 1, 1])
 
-    with tf.variable_scope('addition'):
+    with tf.variable_scope('sub_add'):
         if in_filter != out_filter:
             shortcut_x = _conv(
-                    name='conv3_1x1',
+                    name='conv3',
                     x=shortcut_x,
                     kernel_shape=[1, 1, in_filter, out_filter],
                     strides=strides)
@@ -221,11 +220,12 @@ def _get_strides(isSampling):
 
 def inference(
         image,
-        num_units=[None, 5, 5, 5],
+        num_units=[5, 5, 5],
         num_channels=[16, 16, 32, 64],
         sampling=[False, False, True, True],
-        activate_before_residual=[None, True, False, False],
         isTrain=False): 
+
+    num_units = [1] + num_units
 
     with tf.variable_scope('unit_0'):
         x = _conv(
@@ -233,7 +233,10 @@ def inference(
                 x=image, 
                 kernel_shape=[3, 3, NUM_CHANNELS, num_channels[0]],
                 strides=_get_strides(sampling[0]),
-                weight_decay=CONV_WEIGHT_DECAY)
+                weight_decay=CONV_WEIGHT_DECAY,
+                bias=True)
+
+        x = tf.nn.relu(x)
 
     for unit in range(1, len(num_channels)):
         with tf.variable_scope('unit_%d' % unit):
@@ -243,7 +246,6 @@ def inference(
                         in_filter=num_channels[unit-1], 
                         out_filter=num_channels[unit],
                         strides=_get_strides(sampling[unit]),
-                        activate_before_residual=activate_before_residual[unit],
                         isTrain=isTrain)
 
             for block in range(1, num_units[unit]):
@@ -253,7 +255,6 @@ def inference(
                             in_filter=num_channels[unit],
                             out_filter=num_channels[unit],
                             strides=_get_strides(False),
-                            activate_before_residual=False,
                             isTrain=isTrain)
 
     with tf.variable_scope('unit_global_avg'):
@@ -292,6 +293,7 @@ def loss(logits, labels):
 
         ema = tf.train.ExponentialMovingAverage(0.99)
 
+        #total_loss = cross_entropy_loss + weight_loss
         total_loss = tf.add(cross_entropy_loss, weight_loss, name='total_loss')
 
         loss_ema_op = ema.apply([cross_entropy_loss, weight_loss, total_loss])

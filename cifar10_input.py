@@ -5,6 +5,8 @@ HEIGHT = 32
 WIDTH = 32
 CHANNEL = 3
 
+COLOR_DEPTH = 255
+
 CROP_WIDTH = 4
 
 NUM_CLASSES = 10
@@ -54,6 +56,8 @@ def load_batch(filenames, batch_size, isTrain=False, isShuffle=False):
 
     label.set_shape([1])
 
+    image = 2 * image / COLOR_DEPTH - 1
+
     if isTrain:
         image = tf.image.resize_image_with_crop_or_pad(
                 image=image,
@@ -71,8 +75,7 @@ def load_batch(filenames, batch_size, isTrain=False, isShuffle=False):
         min_queue_examples = int(NUM_EXAMPLES_PER_EPOCH_FOR_TEST *
                                 MIN_FRACTION_OF_EXAMPLES_IN_QUEUE)
 
-
-    image = tf.image.per_image_standardization(image)
+    #image = tf.image.per_image_standardization(image)
 
 
     if isShuffle:
@@ -88,8 +91,6 @@ def load_batch(filenames, batch_size, isTrain=False, isShuffle=False):
                                 batch_size=batch_size,
                                 num_threads=16,
                                 capacity=min_queue_examples + 3 * batch_size)
-                                #min_after_dequeue=min_queue_examples)
-                                # 不存在, 不必要
 
     tf.summary.image('images', images)
 
