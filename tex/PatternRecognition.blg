@@ -1,0 +1,49 @@
+This is BibTeX, Version 0.99d (TeX Live 2015/Debian)
+Capacity: max_strings=35307, hash_size=35307, hash_prime=30011
+The top-level auxiliary file: PatternRecognition.aux
+The style file: plain.bst
+Database file #1: YourFile/reference.bib
+Warning--empty booktitle in Krizhevsky2009LearningML
+Warning--empty booktitle in Lecun1998GradientbasedLA
+You've used 10 entries,
+            2118 wiz_defined-function locations,
+            554 strings with 5566 characters,
+and the built_in function-call counts, 3266 in all, are:
+= -- 294
+> -- 174
+< -- 2
++ -- 68
+- -- 58
+* -- 192
+:= -- 548
+add.period$ -- 30
+call.type$ -- 10
+change.case$ -- 59
+chr.to.int$ -- 0
+cite$ -- 12
+duplicate$ -- 144
+empty$ -- 266
+format.name$ -- 58
+if$ -- 694
+int.to.chr$ -- 0
+int.to.str$ -- 10
+missing$ -- 10
+newline$ -- 53
+num.names$ -- 20
+pop$ -- 81
+preamble$ -- 1
+purify$ -- 49
+quote$ -- 0
+skip$ -- 101
+stack$ -- 0
+substring$ -- 114
+swap$ -- 34
+text.length$ -- 2
+text.prefix$ -- 0
+top$ -- 0
+type$ -- 40
+warning$ -- 2
+while$ -- 24
+width$ -- 12
+write$ -- 104
+(There were 2 warnings)

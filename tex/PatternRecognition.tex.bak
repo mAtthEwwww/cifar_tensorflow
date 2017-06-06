@@ -1,0 +1,23 @@
+\documentclass{thesis/PatternRecognition}
+\usepackage{thesis/scnu}
+\graphicspath {{figures/}}%图片所在的目录
+\captionsetup{font={footnotesize}}
+
+\begin{document}
+
+\input{information/info}
+\input{YourFile/abstract}
+
+\input{YourFile/titleAndFigure}
+\input{YourFile/table}
+\input{YourFile/math}
+\input{YourFile/codes}
+\input{YourFile/howToUse}
+
+
+
+\input{YourFile/reference}
+%如果会使用bibtex可以使用这两句而注释上一句
+%\bibliographystyle{plain}
+%\bibliography{YourFile/reference}
+\end{document}
